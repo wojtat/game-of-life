@@ -55,183 +55,8 @@ namespace GameOfLife
         /// <summary>
         /// All of the cells that are active
         /// </summary>
-        Dictionary<Vector2i, Cell> cells;
-
-        #region Cell
-
-        /// <summary>
-        /// The living or dead cell
-        /// </summary>
-        class Cell
-        {
-            /// <summary>
-            /// The parent grid of this cell that created it
-            /// </summary>
-            private Grid parent;
-
-            /// <summary>
-            /// The position of the cell
-            /// </summary>
-            public Vector2i position;
-
-            /// <summary>
-            /// Determines if the cell is living or not
-            /// </summary>
-            public bool isActive;
-
-            /// <summary>
-            /// The list of all the neighbors this cell has
-            /// </summary>
-            List<Cell> neighbors;
-
-            /// <summary>
-            /// The list of all the neighbors this cell has
-            /// </summary>
-            public List<Cell> Neighbors { get { CountNeighbors(); return neighbors; } }
-
-            #region Constructor
-
-            public Cell(int x, int y, Grid parent, bool isActive = true)
-            {
-                position = new Vector2i(x, y);
-
-                this.isActive = isActive;
-                this.parent = parent;
-
-                neighbors = new List<Cell>(8);
-            }
-
-            #endregion
-
-            /// <summary>
-            /// Counts the number of neighboring cells that are active / alive
-            /// </summary>
-            /// <returns>The number of active neighbors</returns>
-            public int CountNeighbors()
-            {
-                neighbors = new List<Cell>(8);
-
-                int activeNeighbors = 0;
-
-                // The pos of the checked square
-                Vector2i pos;
-
-                // Loop through all the neighbors of this cell
-                for (int xOff = -1; xOff <= 1; xOff++)
-                {
-                    // Set the x coord of the checked square
-                    pos.X = position.X + xOff;
-
-                    for (int yOff = -1; yOff <= 1; yOff++)
-                    {
-                        // Set the y coord of the checked square
-                        pos.Y = position.Y + yOff;
-
-                        // If it's us, continue
-                        if (pos == position)
-                            continue;
-                        
-                        // If we have an active neighbor there
-                        if (parent.cells.ContainsKey(pos) && parent.cells[pos].isActive)
-                        {
-                            // Increment the counter
-                            activeNeighbors++;
-
-                            // Add the cell to the neighbors list variable
-                            neighbors.Add(parent.cells[pos]);
-                        }
-                        else
-                        {
-                            // Add an inactive cell to the neighbors
-                            neighbors.Add(new Cell(pos.X, pos.Y, parent, false));
-                        }
-                    }
-                }
-
-                return activeNeighbors;
-            }
-
-            /// <summary>
-            /// Determines if this cell should be active
-            /// in the next iteration considering its neighbors
-            /// </summary>
-            public bool ShouldBeActive()
-            {
-                // Number of active neighbors
-                int count = CountNeighbors();
-
-                // Apply the classic Game of Life rules
-                if (isActive)
-                {
-                    if (count < 2 || count > 3)
-                        return false;
-                }
-                else
-                {
-                    if (count == 3)
-                        return true;
-                    return false;
-                }
-                return true;
-            }
-
-            /// <summary>
-            /// Get the four vertices representing a square at the index x and y
-            /// </summary>
-            /// <param name="x"></param>
-            /// <param name="y"></param>
-            public Vertex[] cellVertices()
-            {
-                Vertex[] vertices = new Vertex[4];
-
-                float x = position.X;
-                float y = position.Y;
-
-                vertices[0] = new Vertex(new Vector2f(x, y) * parent.RealUnitSize, parent.activeColor);
-                vertices[1] = new Vertex(new Vector2f(x + 1, y) * parent.RealUnitSize, parent.activeColor);
-                vertices[2] = new Vertex(new Vector2f(x + 1, y + 1) * parent.RealUnitSize, parent.activeColor);
-                vertices[3] = new Vertex(new Vector2f(x, y + 1) * parent.RealUnitSize, parent.activeColor);
-
-                return vertices;
-            }
-
-            #region Overrides
-
-            public static bool operator ==(Cell a, Cell b) => /*a == null ? false : */a.Equals(b);
-            public static bool operator !=(Cell a, Cell b) => !a.Equals(b);
-            public override bool Equals(object obj)
-            {
-                if (!(obj is Cell)) return false;
-                Cell other = (Cell)obj;
-
-                return this.position == other.position;
-            }
-            public override int GetHashCode()
-            {
-                return position.GetHashCode();
-            }
-
-            public override string ToString()
-            {
-                return position.ToString();
-            }
-
-            #endregion
-        }
-
-        #endregion
-
-        /// <summary>
-        /// Inactivate a cell at the index x and y,
-        /// does remove the cell from cells
-        /// </summary>
-        /// <param name="x"></param>
-        /// <param name="y"></param>
-        public void RemoveCell(int x, int y)
-        {
-            cells.Remove(new Vector2i(x, y));
-        }
-
+        HashSet<Vector2i> cells;
+        
         /// <summary>
         /// Add a cell at the index x and y to cells
         /// </summary>
@@ -239,11 +64,19 @@ namespace GameOfLife
         /// <param name="y"></param>
         public void AddCell(int x, int y)
         {
+            AddCell(new Vector2i(x, y));
+        }
+
+        /// <summary>
+        /// Add a cell at the index x and y to cells
+        /// </summary>
+        public void AddCell(Vector2i coords)
+        {
             // Don't add if it is already there
-            if (cells.ContainsKey(new Vector2i(x, y)))
+            if (cells.Contains(coords))
                 return;
 
-            cells.Add(new Vector2i(x, y), new Cell(x, y, this));
+            cells.Add(coords);
         }
 
         #region Constructor
@@ -253,7 +86,7 @@ namespace GameOfLife
         /// </summary>
         public Grid()
         {
-            cells = new Dictionary<Vector2i, Cell>();
+            cells = new HashSet<Vector2i>();
 
             // Default values
             unitSize = 10;
@@ -274,6 +107,95 @@ namespace GameOfLife
         #endregion
 
         /// <summary>
+        /// Get the four vertices representing a square at the index x and y
+        /// </summary>
+        /// <param name="x"></param>
+        /// <param name="y"></param>
+        private Vertex[] GetVertices(Vector2i cell)
+        {
+            Vertex[] vertices = new Vertex[4];
+
+            float x = cell.X;
+            float y = cell.Y;
+
+            vertices[0] = new Vertex(new Vector2f(x, y) * RealUnitSize, activeColor);
+            vertices[1] = new Vertex(new Vector2f(x + 1, y) * RealUnitSize, activeColor);
+            vertices[2] = new Vertex(new Vector2f(x + 1, y + 1) * RealUnitSize, activeColor);
+            vertices[3] = new Vertex(new Vector2f(x, y + 1) * RealUnitSize, activeColor);
+
+            return vertices;
+        }
+
+        /// <summary>
+        /// Get all neighboring coordinates of the specified cell,
+        /// regardles of their activation status
+        /// </summary>
+        /// <param name="cell"></param>
+        /// <returns></returns>
+        private HashSet<Vector2i> GetNeighbors(Vector2i cell)
+        {
+            HashSet<Vector2i> neighbors = new HashSet<Vector2i>();
+
+            int x = cell.X;
+            int y = cell.Y;
+
+            // Add all of the neighboring coordinates
+            neighbors.Add(new Vector2i(x - 1, y - 1));
+            neighbors.Add(new Vector2i(x - 1, y));
+            neighbors.Add(new Vector2i(x - 1, y + 1));
+            neighbors.Add(new Vector2i(x, y - 1));
+            neighbors.Add(new Vector2i(x, y + 1));
+            neighbors.Add(new Vector2i(x + 1, y - 1));
+            neighbors.Add(new Vector2i(x + 1, y));
+            neighbors.Add(new Vector2i(x + 1, y + 1));
+
+            return neighbors;
+        }
+
+        /// <summary>
+        /// Get the number of active neighboring cells
+        /// </summary>
+        /// <param name="cell"></param>
+        /// <returns></returns>
+        private int NumberOfNeighbors(Vector2i cell)
+        {
+            int count = 0;
+
+            // Loop through all neighbors of this cell
+            foreach (Vector2i neighbor in GetNeighbors(cell))
+            {
+                if (cells.Contains(neighbor))
+                    count++;
+            }
+
+            return count;
+        }
+
+        /// <summary>
+        /// Determine whether a certain cell should be
+        /// active in the next generation or not
+        /// </summary>
+        /// <param name="cell"></param>
+        /// <returns></returns>
+        private bool ShouldBeActive(Vector2i cell)
+        {
+            int neighbors = NumberOfNeighbors(cell);
+            
+            if (cells.Contains(cell))
+            {
+                if (neighbors == 3 || neighbors == 2)
+                    return true;
+            }
+            else
+            {
+                if (neighbors == 3)
+                    return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// Execute one iteration of the simulation
         /// </summary>
         public void Iterate()
@@ -281,23 +203,20 @@ namespace GameOfLife
             Grid buffer = new Grid();
 
             // List of cells that we've visited
-            List<Cell> visitedCells = new List<Cell>();
+            HashSet<Vector2i> visitedCells = new HashSet<Vector2i>();
 
             // Loop through each cell
-            foreach (KeyValuePair<Vector2i, Cell> pair in cells)
+            foreach (Vector2i current in cells)
             {
-                // Get the current cell
-                Cell current = pair.Value;
-
-                // Get the current cell's neighbors
-                List<Cell> neighbors = current.Neighbors;
+                // Get the current cell's all neighbors
+                HashSet<Vector2i> neighbors = GetNeighbors(current);
 
                 // Loop through all the cell's neighbors
-                foreach (Cell neighbor in neighbors)
+                foreach (Vector2i neighbor in neighbors)
                 {
-                    // If it's an active neighbor, it is in cells too,
-                    // therefore we will check it later or sooner
-                    if (neighbor.isActive) continue;
+                    // It's an active neighbor, therefore we will check it 
+                    // later or sooner because it's in cells
+                    if (cells.Contains(neighbor)) continue;
 
                     // If we've visited this neighbor, continue
                     if (visitedCells.Contains(neighbor)) continue;
@@ -306,8 +225,8 @@ namespace GameOfLife
                     visitedCells.Add(neighbor);
 
                     // If it should be active, add it to the buffer
-                    if (neighbor.ShouldBeActive())
-                        buffer.AddCell(neighbor.position.X, neighbor.position.Y);
+                    if (ShouldBeActive(neighbor))
+                        buffer.AddCell(neighbor);
                 }
 
                 // Add us to the visited cells if we aren't there already
@@ -317,18 +236,13 @@ namespace GameOfLife
                 else
                     continue;
                 
-                if (current.ShouldBeActive())
+                if (ShouldBeActive(current))
                     // We made it to the next generation
-                    buffer.AddCell(current.position.X, current.position.Y);
+                    buffer.AddCell(current);
             }
             
             // Recreate the cells
-            cells = new Dictionary<Vector2i, Cell>();
-
-            foreach (var pair in buffer.cells)
-            {
-                cells.Add(pair.Key, new Cell(pair.Key.X, pair.Key.Y, this));
-            }
+            cells = new HashSet<Vector2i>(buffer.cells);
         }
 
         /// <summary>
@@ -367,13 +281,10 @@ namespace GameOfLife
 
             VertexArray vertices = new VertexArray(PrimitiveType.Quads, (uint)cells.Count * 4);
             
-            foreach (KeyValuePair<Vector2i, Cell> pair in cells)
+            foreach (Vector2i cell in cells)
             {
-                if (!pair.Value.isActive)
-                    continue;
-
                 // Calculate the vertices
-                Vertex[] quad = pair.Value.cellVertices();
+                Vertex[] quad = GetVertices(cell);
 
                 // Add the vertices
                 for (int i = 0; i < 4; i++)
@@ -398,11 +309,11 @@ namespace GameOfLife
         /// <param name="other"></param>
         public void Merge(Grid other)
         {
-            Dictionary<Vector2i, Cell> copy = new Dictionary<Vector2i, Cell>(other.cells);
+            var copy = new HashSet<Vector2i>(other.cells);
 
-            foreach (KeyValuePair<Vector2i, Cell> pair in copy)
+            foreach (Vector2i coords in copy)
             {
-                AddCell(pair.Key.X, pair.Key.Y);
+                AddCell(coords.X, coords.Y);
             }
         }
 
@@ -413,11 +324,11 @@ namespace GameOfLife
         /// <param name="other"></param>
         public void Merge(Grid other, Vector2i offset)
         {
-            Dictionary<Vector2i, Cell> copy = new Dictionary<Vector2i, Cell>(other.cells);
+            var copy = new HashSet<Vector2i>(other.cells);
 
-            foreach (KeyValuePair<Vector2i, Cell> pair in copy)
+            foreach (Vector2i coords in copy)
             {
-                AddCell(pair.Key.X + offset.X, pair.Key.Y + offset.Y);
+                AddCell(coords.X + offset.X, coords.Y + offset.Y);
             }
         }
 
