@@ -103,9 +103,12 @@ namespace GameOfLife
 
             // Handle the Closed event
             Window.Closed += (s, e) => (s as RenderWindow).Close();
+
+            // Reset the view on window resize
+            Window.Resized += (s, e) => (s as RenderWindow).SetView(new View(new FloatRect(0, 0, e.Width, e.Height)));
             
             // Default values
-            clearColor = Color.Black;
+            clearColor = new Color(20, 20, 150);
             DesiredFPS = 60;
 
             Mouse = new MouseController(this);

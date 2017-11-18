@@ -1,6 +1,5 @@
 ﻿using System;
-using System.IO;
-using SFML.Graphics;
+using GameOfLife.Logic;
 using SFML.System;
 using SFML.Window;
 
@@ -15,6 +14,11 @@ namespace GameOfLife
         /// The current generation of the simulation
         /// </summary>
         public int Generation { get; protected set; }
+
+        /// <summary>
+        /// The grid renderer to draw the <see cref="grid"/> with all the cells
+        /// </summary>
+        public GridRenderer gridRenderer;
 
         /// <summary>
         /// The grid with all the cells
@@ -33,27 +37,28 @@ namespace GameOfLife
         /// </summary>
         public Life()
         {
-            grid = new Grid();
+            gridRenderer = new GridRenderer(grid = new Grid());
             screen = new Screen(640, 400, "Game of Life");
             screen.Time.iterationsPerSecond = 1;
-
+            
             screen.Mouse.StartDrag += (s, e) =>
             {
                 if (e.button == Mouse.Button.Left)
-                    grid.isBeingDragged = true;
+                    gridRenderer.isDragging = true;
 
             };
             screen.Mouse.EndDrag += (s, e) =>
             {
                 if (e.button == Mouse.Button.Left)
-                    grid.isBeingDragged = false;
+                    gridRenderer.isDragging = false;
             };
             screen.Mouse.Moved += (s, e) =>
             {
-                if (grid.isBeingDragged)
+                if (gridRenderer.isDragging)
                 {
-                    grid.offset.X -= e.Offset.X;
-                    grid.offset.Y -= e.Offset.Y;
+                    Vector2f newPos = new Vector2f(gridRenderer.Position.X + e.Offset.X, gridRenderer.Position.Y + e.Offset.Y);
+
+                    gridRenderer.Position = newPos;
                 }
             };
             screen.Mouse.Clicked += (s, e) =>
@@ -61,21 +66,27 @@ namespace GameOfLife
                 if (e.button == Mouse.Button.Right)
                 {
                     Vector2f pos = new Vector2f(e.mousePos.X, e.mousePos.Y);
-                    pos += grid.offset;
-                    pos /= grid.RealUnitSize;
-                    grid.AddCell((int)Math.Floor(pos.X), (int)Math.Floor(pos.Y));
+                    pos -= gridRenderer.Position;
+                    pos = new Vector2f(pos.X / gridRenderer.Scale.X, pos.Y / gridRenderer.Scale.Y);
+                    pos /= gridRenderer.unitSize;
+                    grid.Add((int)Math.Floor(pos.X), (int)Math.Floor(pos.Y));
                 }
             };
-
             screen.Window.MouseWheelMoved += (s, e) =>
             {
-                grid.zoomFactor *= (float)Math.Pow(grid.zoomMultiplier, -e.Delta);
-
-                Vector2f offset = new Vector2f(e.X - screen.Width / 2, e.Y - screen.Height / 2);
-
-                grid.offset += (e.Delta < 0) ? -offset : offset;
+                if (e.Delta > 0)
+                    for (int i = 0; i < e.Delta; i++)
+                        gridRenderer.Scale *= 1.2f;
+                else
+                    for (int i = 0; i < -e.Delta; i++)
+                        gridRenderer.Scale /= 1.2f;
             };
-            // TEMPORARY
+
+            grid.Add(0, 0);
+            grid.Add(0, 1);
+            grid.Add(1, 1);
+            grid.Add(1, -1);
+            
             screen.Window.KeyPressed += (s, e) =>
             {
                 if (e.Code == Keyboard.Key.Left)
@@ -84,40 +95,20 @@ namespace GameOfLife
                     screen.Time.iterationsPerSecond *= 1.25f;
             };
 
-            // <TEST>
-            Grid glider = Grid.Load(@"glider.txt");
-            //Grid eater = Grid.Load("eater.txt");
-
-            grid.AddCell(0, 1);
-            grid.AddCell(0, 0);
-            grid.AddCell(1, 0);
-            grid.AddCell(1, 1);
-
-            //grid.Merge(glider);
-            //grid.Merge(eater, new Vector2i(6, 6));
-            // </TEST>
-
             // Hook the Iterate() method to the iteration event
             screen.Time.Iteration += grid.Iterate;
 
             // Increase the generation number
-            screen.Time.Iteration += () =>
-            {
-                Generation++;
+            screen.Time.Iteration += () => Generation++;
 
-                // Add a glider to the scene
-                if (Generation % 14 == 0)
-                {
-                    //grid.Merge(glider);
-                    //grid.Merge(glider, new Vector2i(40, 0));
-                }
-            };
-
-            screen.components.Add(grid);
+            screen.components.Add(gridRenderer);
         }
 
         #endregion
 
+        /// <summary>
+        /// Start the simulation
+        /// </summary>
         public void Start()
         {
             screen.Run();

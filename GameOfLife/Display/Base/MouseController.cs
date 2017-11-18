@@ -210,7 +210,6 @@ namespace GameOfLife
         /// </summary>
         private void OnClicked(Mouse.Button button)
         {
-            Console.WriteLine("clicked: " + button);
             Clicked?.Invoke(parent.Window, new MouseEventArgs(Position, button));
         }
 
